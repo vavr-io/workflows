@@ -1,0 +1,29 @@
+name: autoupdate
+
+on:
+  workflow_call:
+    secrets:
+      AUTOUPDATE_GITHUB_TOKEN:
+        required: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  autoupdate:
+    name: autoupdate
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Run autoupdate
+        uses: docker://chinthakagodawita/autoupdate-action:v1@sha256:53d7013ad4689b703d2715d4b17d4901bb0a385e495e0b481f37adbe9b3cc3fc
+        env:
+          GITHUB_TOKEN: "${{ secrets.AUTOUPDATE_GITHUB_TOKEN }}"
+          DRY_RUN: "false"
+          PR_FILTER: "labelled"
+          PR_LABELS: "autoupdate"
+          EXCLUDED_LABELS: "dependencies,wontfix"
+          MERGE_MSG: "Branch was auto-updated with latest changes from master"
+          RETRY_COUNT: "5"
+          RETRY_SLEEP: "300"
+          MERGE_CONFLICT_ACTION: "ignore"
