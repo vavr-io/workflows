@@ -1,0 +1,70 @@
+name: release
+
+on:
+  workflow_call:
+    inputs:
+      release-tag:
+        description: 'Tag to release (must start with "v", e.g., v1.2.3)'
+        required: true
+        type: string
+      java-version:
+        description: 'Java version to use'
+        required: false
+        default: '21'
+        type: string
+    secrets:
+      CENTRAL_USERNAME:
+        required: true
+      CENTRAL_PASSWORD:
+        required: true
+      MAVEN_GPG_PRIVATE_KEY:
+        required: true
+      MAVEN_GPG_PASSPHRASE:
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    name: Release ${{ inputs.release-tag }}
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.release-tag }}
+
+      - name: Validate release tag format
+        shell: bash
+        run: |
+          TAG="${{ inputs.release-tag }}"
+
+          if [[ ! "$TAG" =~ ^v[0-9]+(\.[0-9]+)*(-[a-zA-Z0-9]+)?$ ]]; then
+            echo "❌ Invalid tag format: '$TAG'"
+            echo "✅ Tag must start with 'v' and follow semantic versioning (e.g., v1.0.0 or v1.2.3-RC1)"
+            exit 1
+          fi
+
+          if ! git show-ref --tags --verify --quiet "refs/tags/${TAG}"; then
+            echo "❌ Tag '$TAG' does not exist in the repository"
+            exit 1
+          fi
+
+      - name: Setup JDK
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: ${{ inputs.java-version }}
+          cache: maven
+          server-id: central
+          server-username: CENTRAL_USERNAME
+          server-password: CENTRAL_PASSWORD
+          gpg-private-key: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
+
+      - name: Release
+        run: mvn -B --no-transfer-progress -Pmaven-central-release -DskipTests=true deploy
+        env:
+          CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
+          CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
